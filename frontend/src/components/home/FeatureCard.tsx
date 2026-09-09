@@ -6,11 +6,7 @@ type FeatureCardProps = {
   description: string;
 };
 
-/**
- * Single feature card used by the Features section.
- * Presentational only — content is passed in via props so it can be
- * reused for any future feature list.
- */
+
 export default function FeatureCard({
   icon,
   title,

@@ -1,20 +1,26 @@
-import Navbar from "./components/layout/Navbar";
-import Hero from "./components/home/Hero";
-import Features from "./components/home/Features";
-import UpcomingEvents from "./components/home/UpcomingEvents";
-import Footer from "./components/layout/Footer";
+import { Routes, Route } from "react-router-dom";
+import Layout from "./components/layout/Layout";
+import Home from "./pages/Home";
+import Rooms from "./pages/Rooms";
+import Events from "./pages/Events";
+import Book from "./pages/Book";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-      <main>
-        <Hero />
-        <Features />
-        <UpcomingEvents />
-      </main>
-      <Footer />
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/rooms" element={<Rooms />} />
+        <Route path="/events" element={<Events />} />
+        <Route path="/book" element={<Book />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Route>
+    </Routes>
   );
 }
 

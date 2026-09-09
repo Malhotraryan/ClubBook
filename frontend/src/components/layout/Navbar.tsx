@@ -1,12 +1,15 @@
+import { Link } from "react-router-dom";
+
 type NavLinkItem = {
   label: string;
-  href: string;
+  to: string;
 };
 
 const navLinks: NavLinkItem[] = [
-  { label: "Home", href: "/" },
-  { label: "Book Room", href: "/book" },
-  { label: "Events", href: "/events" },
+  { label: "Home", to: "/" },
+  {label: "Rooms", to: "/rooms"},
+  { label: "Book Room", to: "/book" },
+  { label: "Events", to: "/events" },
 ];
 
 export default function Navbar() {
@@ -17,35 +20,38 @@ export default function Navbar() {
         aria-label="Primary"
       >
         {/* Branding */}
-        <a href="/" className="text-xl font-bold tracking-tight text-slate-900">
+        <Link
+          to="/"
+          className="text-xl font-bold tracking-tight text-slate-900"
+        >
           Club<span className="text-blue-600">Book</span>
-        </a>
+        </Link>
 
         {/* Desktop links */}
         <ul className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
             <li key={link.label}>
-              <a
-                href={link.href}
+              <Link
+                to={link.to}
                 className="text-sm font-medium text-slate-600 transition-colors hover:text-blue-600"
               >
                 {link.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
 
         {/* Login */}
         <div className="hidden items-center gap-4 md:flex">
-          <a
-            href="/login"
+          <Link
+            to="/login"
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
           >
             Login
-          </a>
+          </Link>
         </div>
 
-        {/* Mobile menu button - interaction will be added later */}
+        {/* Mobile menu button - functionality will be added later */}
         <button
           type="button"
           className="inline-flex items-center justify-center rounded-md p-2 text-slate-600 md:hidden"
