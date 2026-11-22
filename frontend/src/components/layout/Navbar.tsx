@@ -7,9 +7,11 @@ type NavLinkItem = {
 
 const navLinks: NavLinkItem[] = [
   { label: "Home", to: "/" },
+  { label: "Dashboard", to: "/dashboard" },
   {label: "Rooms", to: "/rooms"},
   { label: "Book Room", to: "/book" },
   { label: "Events", to: "/events" },
+  { label: "Create Event", to: "/create-event" },
 ];
 
 export default function Navbar() {

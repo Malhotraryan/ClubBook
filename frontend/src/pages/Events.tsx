@@ -1,57 +1,141 @@
+
+import { useEffect, useState } from "react";
 import EventCard, { type ClubEvent } from "../components/home/EventCard";
 
-// Temporary frontend-only data. Will be replaced by a Spring Boot API
-// call (e.g. GET /api/events) later. Same shape as the events used on
-// the homepage's Upcoming Events section.
-const events: ClubEvent[] = [
-  {
-    id: "evt-1",
-    title: "Intro to Robotics Workshop",
-    club: "Robotics Club",
-    date: "Sep 12, 2026",
-    time: "4:00 PM",
-    room: "Room 204, Engineering Block",
-  },
-  {
-    id: "evt-2",
-    title: "Open Mic Night",
-    club: "Music Society",
-    date: "Sep 15, 2026",
-    time: "6:30 PM",
-    room: "Auditorium",
-  },
-  {
-    id: "evt-3",
-    title: "Debate Championship Prelims",
-    club: "Debate Club",
-    date: "Sep 18, 2026",
-    time: "2:00 PM",
-    room: "Room 110, Arts Block",
-  },
-  {
-    id: "evt-4",
-    title: "Photography Walk",
-    club: "Photography Club",
-    date: "Sep 22, 2026",
-    time: "5:00 PM",
-    room: "Main Gate Lawn",
-  },
-  {
-    id: "evt-5",
-    title: "Startup Pitch Night",
-    club: "Entrepreneurship Cell",
-    date: "Sep 25, 2026",
-    time: "3:30 PM",
-    room: "Seminar Hall 2, Science Block",
-  },
-];
+type BackendEvent = {
+  id: string;
+  title: string;
+  description: string;
+  clubName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  expectedAttendees: number;
+  bookingId: string;
+  status: string;
+};
 
-/**
- * Events page ("/events").
- * Lists every upcoming club event using the same EventCard component
- * and ClubEvent data shape as the homepage's Upcoming Events section.
- */
+type Booking = {
+  id: string;
+  roomId: string;
+};
+
+type Room = {
+  id: string;
+  name: string;
+  building: string;
+};
+
+const EVENTS_API = "http://localhost:8080/api/events";
+const BOOKINGS_API = "http://localhost:8080/api/bookings";
+const ROOMS_API = "http://localhost:8080/api/rooms";
+
+// Convert 2026-11-10 into Nov 10, 2026
+function formatDate(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Convert 14:00 into 2:00 PM
+function formatTime(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function Events() {
+  const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const [eventsResponse, bookingsResponse, roomsResponse] =
+          await Promise.all([
+            fetch(EVENTS_API),
+            fetch(BOOKINGS_API),
+            fetch(ROOMS_API),
+          ]);
+
+        if (
+          !eventsResponse.ok ||
+          !bookingsResponse.ok ||
+          !roomsResponse.ok
+        ) {
+          throw new Error("Could not load event information.");
+        }
+
+        const backendEvents: BackendEvent[] =
+          await eventsResponse.json();
+
+        const bookings: Booking[] = await bookingsResponse.json();
+
+        const rooms: Room[] = await roomsResponse.json();
+
+        // Convert backend data into the format required by EventCard
+        const formattedEvents: ClubEvent[] = backendEvents.map((event) => {
+          const booking = bookings.find(
+            (item) => item.id === event.bookingId
+          );
+
+          const room = rooms.find(
+            (item) => item.id === booking?.roomId
+          );
+
+          return {
+            id: event.id,
+            title: event.title,
+            club: event.clubName,
+            date: formatDate(event.date),
+            time: `${formatTime(event.startTime)} - ${formatTime(event.endTime)}`,
+            room: room
+              ? `${room.name}, ${room.building}`
+              : "Room details unavailable",
+          };
+        });
+
+        setEvents(formattedEvents);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong while loading events."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEvents();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <p className="text-center text-slate-500">
+          Loading events...
+        </p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <p className="rounded-lg bg-red-50 p-4 text-center text-red-600">
+          {error}
+        </p>
+      </section>
+    );
+  }
+
   const hasEvents = events.length > 0;
 
   return (
@@ -60,9 +144,9 @@ export default function Events() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Events
         </h1>
+
         <p className="mt-4 text-lg text-slate-600">
-          See what clubs and societies across campus are organizing, from
-          workshops to competitions.
+          See upcoming events at LNMIIT
         </p>
       </div>
 
@@ -77,6 +161,7 @@ export default function Events() {
           <p className="text-base font-medium text-slate-600">
             No events scheduled right now.
           </p>
+
           <p className="mt-1 text-sm text-slate-500">
             Check back soon for upcoming club events.
           </p>

@@ -1,3 +1,4 @@
+
 export type RoomStatus = "AVAILABLE" | "MAINTENANCE";
 
 export type Room = {
@@ -5,8 +6,8 @@ export type Room = {
   name: string;
   building: string;
   capacity: number;
-  facilities: string[];
-  status: RoomStatus;
+  facilities?: string[];
+  status?: RoomStatus;
 };
 
 type RoomCardProps = {
@@ -23,11 +24,6 @@ const statusLabels: Record<RoomStatus, string> = {
   MAINTENANCE: "Under Maintenance",
 };
 
-/**
- * Single room card used by the Rooms page.
- * Presentational only — takes a full Room object so future API data
- * can be passed straight through without reshaping.
- */
 export default function RoomCard({ room }: RoomCardProps) {
   return (
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md">
@@ -36,14 +32,19 @@ export default function RoomCard({ room }: RoomCardProps) {
           <h3 className="text-base font-semibold text-slate-900">
             {room.name}
           </h3>
-          <p className="mt-0.5 text-sm text-slate-500">{room.building}</p>
+
+          <p className="mt-0.5 text-sm text-slate-500">
+            {room.building}
+          </p>
         </div>
 
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[room.status]}`}
-        >
-          {statusLabels[room.status]}
-        </span>
+        {room.status && (
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyles[room.status]}`}
+          >
+            {statusLabels[room.status]}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
@@ -62,19 +63,22 @@ export default function RoomCard({ room }: RoomCardProps) {
             d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-6 0 4 4 0 016 0zm6 3a4 4 0 10-8 0"
           />
         </svg>
+
         <span>Capacity: {room.capacity}</span>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
-        {room.facilities.map((facility) => (
-          <span
-            key={facility}
-            className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
-          >
-            {facility}
-          </span>
-        ))}
-      </div>
+      {room.facilities && room.facilities.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3">
+          {room.facilities.map((facility) => (
+            <span
+              key={facility}
+              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600"
+            >
+              {facility}
+            </span>
+          ))}
+        </div>
+      )}
 
       <button
         type="button"

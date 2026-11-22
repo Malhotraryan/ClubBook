@@ -1,13 +1,12 @@
-import { useState } from "react";
-import { rooms } from "../data/rooms.ts";
 
-/**
- * Book Room page ("/book").
- * A simple controlled form for submitting a room booking request.
- * All fields live in one state object, updated by a single change
- * handler shared across inputs/selects.
- */
+import { useEffect, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import type { Room } from "../components/rooms/RoomCard";
+
 export default function Book() {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(true);
+
   const [formData, setFormData] = useState({
     clubName: "",
     purpose: "",
@@ -19,21 +18,97 @@ export default function Book() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch rooms from Spring Boot when the page loads
+  useEffect(() => {
+    fetch("http://localhost:8080/api/rooms")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch rooms");
+        }
+
+        return response.json();
+      })
+      .then((data: Room[]) => {
+        setRooms(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching rooms:", error);
+        setError("Unable to load rooms. Please try again.");
+      })
+      .finally(() => {
+        setLoadingRooms(false);
+      });
+  }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    setSubmitted(false);
+    setError("");
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Temporary frontend-only behavior. This will later send the
-    // booking request to a Spring Boot API (e.g. POST /api/bookings).
-    console.log("Booking request:", formData);
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitted(false);
+    setError("");
+
+    try {
+      const bookingData = {
+        id: crypto.randomUUID(),
+        ...formData,
+        attendees: Number(formData.attendees),
+      };
+
+      const response = await fetch(
+        "http://localhost:8080/api/bookings",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(bookingData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage = await response.text();
+        throw new Error(errorMessage || "Booking failed.");
+      }
+
+      setSubmitted(true);
+
+      setFormData({
+        clubName: "",
+        purpose: "",
+        roomId: "",
+        date: "",
+        startTime: "",
+        endTime: "",
+        attendees: "",
+      });
+    } catch (error) {
+      console.error("Booking error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -42,6 +117,7 @@ export default function Book() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Book a Room
         </h1>
+
         <p className="mt-4 text-lg text-slate-600">
           Submit a room booking request for your club's meeting, workshop,
           or event.
@@ -56,6 +132,7 @@ export default function Book() {
           >
             Club Name
           </label>
+
           <input
             id="clubName"
             name="clubName"
@@ -75,6 +152,7 @@ export default function Book() {
           >
             Event / Purpose
           </label>
+
           <input
             id="purpose"
             name="purpose"
@@ -94,20 +172,27 @@ export default function Book() {
           >
             Room
           </label>
+
           <select
             id="roomId"
             name="roomId"
             required
             value={formData.roomId}
             onChange={handleChange}
+            disabled={loadingRooms || rooms.length === 0}
             className="mt-2 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
           >
             <option value="" disabled>
-              Select a room
+              {loadingRooms
+                ? "Loading rooms..."
+                : rooms.length === 0
+                  ? "No rooms available"
+                  : "Select a room"}
             </option>
+
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
-                {room.name} &mdash; {room.building}
+                {room.name} — {room.building}
               </option>
             ))}
           </select>
@@ -121,6 +206,7 @@ export default function Book() {
             >
               Date
             </label>
+
             <input
               id="date"
               name="date"
@@ -139,6 +225,7 @@ export default function Book() {
             >
               Start Time
             </label>
+
             <input
               id="startTime"
               name="startTime"
@@ -157,6 +244,7 @@ export default function Book() {
             >
               End Time
             </label>
+
             <input
               id="endTime"
               name="endTime"
@@ -176,6 +264,7 @@ export default function Book() {
           >
             Number of Attendees
           </label>
+
           <input
             id="attendees"
             name="attendees"
@@ -191,14 +280,21 @@ export default function Book() {
 
         <button
           type="submit"
-          className="w-full rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
+          disabled={submitting || loadingRooms || rooms.length === 0}
+          className="w-full rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         >
-          Submit Booking
+          {submitting ? "Submitting..." : "Submit Booking"}
         </button>
 
         {submitted && (
           <p className="text-sm font-medium text-green-700">
-            Booking request submitted successfully.
+            Booking request submitted successfully!
+          </p>
+        )}
+
+        {error && (
+          <p className="text-sm font-medium text-red-600">
+            {error}
           </p>
         )}
       </form>

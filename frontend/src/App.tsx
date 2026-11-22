@@ -7,6 +7,10 @@ import Book from "./pages/Book";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import AdminBookings from "./pages/AdminBookings";
+import AdminDashboard from "./pages/AdminDashboard";
+import CreateEvent from "./pages/CreateEvent";
+import AdminEvents from "./pages/AdminEvents";
 
 function App() {
   return (
@@ -19,6 +23,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/admin/bookings" element={<AdminBookings />} /> 
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/create-event" element={<CreateEvent />} />
+        <Route path="/admin/events" element={<AdminEvents />} />
       </Route>
     </Routes>
   );

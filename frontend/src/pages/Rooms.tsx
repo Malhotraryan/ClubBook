@@ -1,19 +1,45 @@
-import { useState } from "react";
-import RoomCard from "../components/rooms/RoomCard";
-import { rooms } from "../data/rooms.ts";
+
+import { useEffect, useState } from "react";
+import RoomCard, { type Room } from "../components/rooms/RoomCard";
 
 export default function Rooms() {
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [minCapacity, setMinCapacity] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("http://localhost:8080/api/rooms")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch rooms");
+        }
+
+        return response.json();
+      })
+      .then((data: Room[]) => {
+        setRooms(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching rooms:", error);
+        setError("Unable to load rooms. Please try again.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   const filteredRooms = rooms.filter((room) => {
     const query = searchTerm.trim().toLowerCase();
+
     const matchesSearch =
       query === "" ||
       room.name.toLowerCase().includes(query) ||
       room.building.toLowerCase().includes(query);
 
     const capacityValue = Number(minCapacity);
+
     const matchesCapacity =
       minCapacity === "" || room.capacity >= capacityValue;
 
@@ -26,6 +52,7 @@ export default function Rooms() {
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Available Rooms
         </h1>
+
         <p className="mt-4 text-lg text-slate-600">
           Browse classrooms and lecture halls available for your club's next
           meeting, workshop, or event.
@@ -51,7 +78,15 @@ export default function Rooms() {
         />
       </div>
 
-      {filteredRooms.length > 0 ? (
+      {loading ? (
+        <p className="mt-10 text-slate-600">
+          Loading rooms...
+        </p>
+      ) : error ? (
+        <p className="mt-10 text-red-600">
+          {error}
+        </p>
+      ) : filteredRooms.length > 0 ? (
         <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredRooms.map((room) => (
             <RoomCard key={room.id} room={room} />
