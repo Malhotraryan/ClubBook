@@ -1,32 +1,70 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
 
-/**
- * Login page ("/login").
- * Frontend-only login form for now. Real authentication (API call,
- * token storage, etc.) will be connected later once the Spring Boot
- * backend exists.
- */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+interface LoginResponse {
+  token: string;
+  email: string;
+  role: string;
+  clubName: string;
+  message: string;
+}
+
 export default function Login() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    // Temporary frontend-only behavior. This will later send the
-    // credentials to a Spring Boot API (e.g. POST /api/auth/login).
-    console.log("Login attempt:", formData);
-    setSubmitted(true);
+    try {
+      const response = await fetch("http://localhost:8080/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Invalid email or password.");
+      }
+
+      const data: LoginResponse = await response.json();
+
+      // Save login details for this browser session
+      sessionStorage.setItem("token", data.token);
+      sessionStorage.setItem("email", data.email);
+      sessionStorage.setItem("role", data.role);
+      sessionStorage.setItem("clubName", data.clubName);
+
+      // Redirect based on user role
+      if (data.role === "ADMIN") {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Login failed. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,10 +80,7 @@ export default function Login() {
 
       <form onSubmit={handleSubmit} className="mt-10 space-y-6">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="email" className="block text-sm font-medium text-slate-700">
             Email
           </label>
           <input
@@ -61,10 +96,7 @@ export default function Login() {
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label htmlFor="password" className="block text-sm font-medium text-slate-700">
             Password
           </label>
           <input
@@ -79,29 +111,18 @@ export default function Login() {
           />
         </div>
 
+        {error && (
+          <p className="text-sm font-medium text-red-600">{error}</p>
+        )}
+
         <button
           type="submit"
-          className="w-full rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+          disabled={loading}
+          className="w-full rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Login
+          {loading ? "Logging in..." : "Login"}
         </button>
-
-        {submitted && (
-          <p className="text-sm font-medium text-green-700">
-            Login functionality will be connected soon.
-          </p>
-        )}
       </form>
-
-      <p className="mt-6 text-center text-sm text-slate-600">
-        Don't have an account?{" "}
-        <Link
-          to="/register"
-          className="font-semibold text-blue-600 transition-colors hover:text-blue-700"
-        >
-          Register
-        </Link>
-      </p>
     </section>
   );
 }

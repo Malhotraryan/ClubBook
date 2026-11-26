@@ -1,172 +1,180 @@
 
-import { useEffect, useState } from "react";
-import EventCard, { type ClubEvent } from "../components/home/EventCard";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { apiFetch } from "../api";
 
-type BackendEvent = {
+interface EventItem {
   id: string;
-  title: string;
-  description: string;
-  clubName: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  expectedAttendees: number;
-  bookingId: string;
-  status: string;
-};
-
-type Booking = {
-  id: string;
-  roomId: string;
-};
-
-type Room = {
-  id: string;
-  name: string;
-  building: string;
-};
-
-const EVENTS_API = "http://localhost:8080/api/events";
-const BOOKINGS_API = "http://localhost:8080/api/bookings";
-const ROOMS_API = "http://localhost:8080/api/rooms";
-
-// Convert 2026-11-10 into Nov 10, 2026
-function formatDate(date: string) {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// Convert 14:00 into 2:00 PM
-function formatTime(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-
-  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  name?: string;
+  title?: string;
+  eventName?: string;
+  description?: string;
+  clubName?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  status?: string;
+  venue?: string;
+  roomName?: string;
 }
 
 export default function Events() {
-  const [events, setEvents] = useState<ClubEvent[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const [eventsResponse, bookingsResponse, roomsResponse] =
-          await Promise.all([
-            fetch(EVENTS_API),
-            fetch(BOOKINGS_API),
-            fetch(ROOMS_API),
-          ]);
+  const location = useLocation();
 
-        if (
-          !eventsResponse.ok ||
-          !bookingsResponse.ok ||
-          !roomsResponse.ok
-        ) {
-          throw new Error("Could not load event information.");
-        }
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-        const backendEvents: BackendEvent[] =
-          await eventsResponse.json();
+      const response = await apiFetch("/api/events");
+      const data: EventItem[] = await response.json();
 
-        const bookings: Booking[] = await bookingsResponse.json();
-
-        const rooms: Room[] = await roomsResponse.json();
-
-        // Convert backend data into the format required by EventCard
-        const formattedEvents: ClubEvent[] = backendEvents.map((event) => {
-          const booking = bookings.find(
-            (item) => item.id === event.bookingId
-          );
-
-          const room = rooms.find(
-            (item) => item.id === booking?.roomId
-          );
-
-          return {
-            id: event.id,
-            title: event.title,
-            club: event.clubName,
-            date: formatDate(event.date),
-            time: `${formatTime(event.startTime)} - ${formatTime(event.endTime)}`,
-            room: room
-              ? `${room.name}, ${room.building}`
-              : "Room details unavailable",
-          };
-        });
-
-        setEvents(formattedEvents);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong while loading events."
-        );
-      } finally {
-        setLoading(false);
-      }
+      // Display approved events only
+      setEvents(
+        data.filter(
+          (event) => event.status?.toUpperCase() === "APPROVED"
+        )
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to load events."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    fetchEvents();
   }, []);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents, location.key]);
+
+  const getEventName = (event: EventItem) => {
+    return event.eventName || event.title || event.name || "Untitled Event";
+  };
 
   if (loading) {
     return (
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <p className="text-center text-slate-500">
-          Loading events...
-        </p>
-      </section>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-slate-600">Loading events...</p>
+      </div>
     );
   }
-
-  if (error) {
-    return (
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <p className="rounded-lg bg-red-50 p-4 text-center text-red-600">
-          {error}
-        </p>
-      </section>
-    );
-  }
-
-  const hasEvents = events.length > 0;
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="max-w-2xl">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-          Events
-        </h1>
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mb-10 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Campus Events
+          </h1>
+          <p className="mt-2 text-slate-600">
+            Explore upcoming events organized by campus clubs.
+          </p>
+        </div>
 
-        <p className="mt-4 text-lg text-slate-600">
-          See upcoming events at LNMIIT
-        </p>
+        {sessionStorage.getItem("role") === "CLUB" && (
+          <Link
+            to="/create-event"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+          >
+            Create Event
+          </Link>
+        )}
       </div>
 
-      {hasEvents ? (
-        <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
+      {error && (
+        <div className="rounded-lg bg-red-50 p-4 text-red-700">
+          {error}
         </div>
-      ) : (
-        <div className="mt-10 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
-          <p className="text-base font-medium text-slate-600">
-            No events scheduled right now.
-          </p>
+      )}
 
-          <p className="mt-1 text-sm text-slate-500">
-            Check back soon for upcoming club events.
+      {!error && events.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
+          <h2 className="text-xl font-semibold text-slate-800">
+            No events available
+          </h2>
+          <p className="mt-2 text-slate-600">
+            Approved events will appear here.
           </p>
         </div>
       )}
-    </section>
+
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {events.map((event) => (
+          <article
+            key={event.id}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+          >
+            <div className="h-2 bg-blue-600" />
+
+            <div className="p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Campus Event
+                </span>
+
+                {event.status && (
+                  <span className="text-xs font-medium text-slate-500">
+                    {event.status}
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-xl font-bold text-slate-900">
+                {getEventName(event)}
+              </h2>
+
+              {event.description && (
+                <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                  {event.description}
+                </p>
+              )}
+
+              <div className="mt-5 space-y-3 text-sm text-slate-600">
+                {event.clubName && (
+                  <p>
+                    <span className="font-semibold text-slate-800">
+                      Organized by:
+                    </span>{" "}
+                    {event.clubName}
+                  </p>
+                )}
+
+                {event.date && (
+                  <p>
+                    <span className="font-semibold text-slate-800">
+                      Date:
+                    </span>{" "}
+                    {event.date}
+                  </p>
+                )}
+
+                {(event.startTime || event.endTime) && (
+                  <p>
+                    <span className="font-semibold text-slate-800">
+                      Time:
+                    </span>{" "}
+                    {event.startTime || "--"} - {event.endTime || "--"}
+                  </p>
+                )}
+
+                {(event.roomName || event.venue) && (
+                  <p>
+                    <span className="font-semibold text-slate-800">
+                      Venue:
+                    </span>{" "}
+                    {event.roomName || event.venue}
+                  </p>
+                )}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
   );
 }

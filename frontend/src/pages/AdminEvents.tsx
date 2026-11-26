@@ -1,4 +1,6 @@
+
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../api";
 
 type Event = {
   id: string;
@@ -19,24 +21,22 @@ export default function AdminEvents() {
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
 
-  // Fetch all pending events from the backend
+  // Fetch all pending events
   const loadEvents = useCallback(async () => {
     try {
       setError("");
 
-      const response = await fetch(
-        "http://localhost:8080/api/events/pending"
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch pending events.");
-      }
+      const response = await apiFetch("/api/events/pending");
 
       const data: Event[] = await response.json();
       setEvents(data);
     } catch (err) {
+      console.error("Admin events error:", err);
+
       setError(
-        err instanceof Error ? err.message : "Something went wrong."
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
       );
     } finally {
       setLoading(false);
@@ -56,23 +56,18 @@ export default function AdminEvents() {
       setActionId(eventId);
       setError("");
 
-      const response = await fetch(
-        `http://localhost:8080/api/events/${eventId}/${decision}`,
-        {
-          method: "PUT",
-        }
-      );
+      await apiFetch(`/api/events/${eventId}/${decision}`, {
+        method: "PUT",
+      });
 
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Failed to ${decision} event.`);
-      }
-
-      // Refresh the list after the decision
       await loadEvents();
     } catch (err) {
+      console.error("Event action error:", err);
+
       setError(
-        err instanceof Error ? err.message : "Something went wrong."
+        err instanceof Error
+          ? err.message
+          : "Something went wrong."
       );
     } finally {
       setActionId(null);
@@ -83,12 +78,12 @@ export default function AdminEvents() {
     <div className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
 
-        {/* Page heading */}
         <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
               Manage Events
             </h1>
+
             <p className="mt-2 text-slate-600">
               Review event requests submitted by college clubs.
             </p>
@@ -103,40 +98,37 @@ export default function AdminEvents() {
           </button>
         </div>
 
-        {/* Pending count */}
         <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-5">
           <p className="text-sm font-medium text-blue-700">
             Pending Event Requests
           </p>
+
           <p className="mt-1 text-3xl font-bold text-blue-900">
             {events.length}
           </p>
         </div>
 
-        {/* Error message */}
         {error && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        {/* Loading state */}
         {loading ? (
           <div className="py-16 text-center text-slate-500">
             Loading pending events...
           </div>
         ) : events.length === 0 ? (
-          /* Empty state */
           <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
             <h2 className="text-lg font-semibold text-slate-800">
               No pending events
             </h2>
+
             <p className="mt-2 text-sm text-slate-500">
               All event requests have been reviewed.
             </p>
           </div>
         ) : (
-          /* Event cards */
           <div className="grid gap-6 md:grid-cols-2">
             {events.map((event) => (
               <div
@@ -148,6 +140,7 @@ export default function AdminEvents() {
                     <h2 className="text-xl font-bold text-slate-900">
                       {event.title}
                     </h2>
+
                     <p className="mt-1 text-sm font-medium text-blue-600">
                       {event.clubName}
                     </p>
@@ -178,7 +171,9 @@ export default function AdminEvents() {
                   </div>
 
                   <div className="flex justify-between gap-3">
-                    <span className="text-slate-500">Expected attendees</span>
+                    <span className="text-slate-500">
+                      Expected attendees
+                    </span>
                     <span className="font-medium text-slate-800">
                       {event.expectedAttendees}
                     </span>
@@ -192,22 +187,29 @@ export default function AdminEvents() {
                   </div>
                 </div>
 
-                {/* Approve and reject buttons */}
                 <div className="mt-6 flex gap-3">
                   <button
-                    onClick={() => handleDecision(event.id, "approve")}
+                    onClick={() =>
+                      handleDecision(event.id, "approve")
+                    }
                     disabled={actionId !== null}
                     className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {actionId === event.id ? "Processing..." : "Approve"}
+                    {actionId === event.id
+                      ? "Processing..."
+                      : "Approve"}
                   </button>
 
                   <button
-                    onClick={() => handleDecision(event.id, "reject")}
+                    onClick={() =>
+                      handleDecision(event.id, "reject")
+                    }
                     disabled={actionId !== null}
                     className="flex-1 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {actionId === event.id ? "Processing..." : "Reject"}
+                    {actionId === event.id
+                      ? "Processing..."
+                      : "Reject"}
                   </button>
                 </div>
               </div>

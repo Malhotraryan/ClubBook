@@ -5,11 +5,12 @@ import com.clubbook.backend.Booking;
 import com.clubbook.backend.BookingStatus;
 import com.clubbook.backend.service.BookingService;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 public class BookingController {
 
@@ -19,26 +20,36 @@ public class BookingController {
         this.bookingService = bookingService;
     }
 
-    // Create a new booking
+    // CLUB only: create a booking
     @PostMapping("/api/bookings")
-    public Booking createBooking(@RequestBody Booking booking) {
-        return bookingService.createBooking(booking);
+    @PreAuthorize("hasRole('CLUB')")
+    public Booking createBooking(
+            @RequestBody Booking booking,
+            Authentication authentication) {
+
+        return bookingService.createBooking(
+                booking,
+                authentication.getName()
+        );
     }
 
-    // Get all bookings
+    // CLUB gets its own bookings; ADMIN gets all bookings
     @GetMapping("/api/bookings")
-    public List<Booking> getAllBookings() {
-        return bookingService.getAllBookings();
+    @PreAuthorize("hasAnyRole('CLUB', 'ADMIN')")
+    public List<Booking> getBookings(Authentication authentication) {
+        return bookingService.getBookingsForUser(authentication.getName());
     }
 
-    // Get only pending bookings
+    // ADMIN only: view pending bookings
     @GetMapping("/api/bookings/pending")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Booking> getPendingBookings() {
         return bookingService.getPendingBookings();
     }
 
-    // Approve a booking
+    // ADMIN only: approve booking
     @PutMapping("/api/bookings/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public Booking approveBooking(@PathVariable String id) {
         return bookingService.updateBookingStatus(
                 id,
@@ -46,8 +57,9 @@ public class BookingController {
         );
     }
 
-    // Reject a booking
+    // ADMIN only: reject booking
     @PutMapping("/api/bookings/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     public Booking rejectBooking(@PathVariable String id) {
         return bookingService.updateBookingStatus(
                 id,

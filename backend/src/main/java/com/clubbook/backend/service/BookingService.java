@@ -3,9 +3,13 @@ package com.clubbook.backend.service;
 
 import com.clubbook.backend.Booking;
 import com.clubbook.backend.BookingStatus;
+import com.clubbook.backend.User;
+import com.clubbook.backend.UserRole;
 import com.clubbook.backend.repository.BookingRepository;
+import com.clubbook.backend.repository.UserRepository;
 
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -14,13 +18,31 @@ import java.util.List;
 public class BookingService {
 
     private final BookingRepository bookingRepository;
+    private final UserRepository userRepository;
 
-    public BookingService(BookingRepository bookingRepository) {
+    public BookingService(
+            BookingRepository bookingRepository,
+            UserRepository userRepository) {
         this.bookingRepository = bookingRepository;
+        this.userRepository = userRepository;
     }
 
-    // Create a new booking request
-    public Booking createBooking(Booking booking) {
+    // Create a booking using the authenticated user's identity
+    public Booking createBooking(Booking booking, String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found!"));
+
+        // Only CLUB users can create bookings
+        if (user.getRole() != UserRole.CLUB) {
+            throw new AccessDeniedException(
+                    "Only club accounts can create bookings."
+            );
+        }
+
+        // Never trust the club name submitted by the frontend
+        booking.setClubName(user.getClubName());
 
         if (booking.getClubName() == null || booking.getClubName().isBlank()) {
             throw new IllegalArgumentException("Club name is required!");
@@ -41,17 +63,14 @@ public class BookingService {
             throw new IllegalArgumentException("End time must be after start time!");
         }
 
-        // Every new booking starts as PENDING
         booking.setStatus(BookingStatus.PENDING);
 
-        // Find bookings for the same room and date
         List<Booking> existingBookings =
                 bookingRepository.findByRoomIdAndDate(
                         booking.getRoomId(),
                         booking.getDate()
                 );
 
-        // Check whether an approved booking already occupies this time
         for (Booking existing : existingBookings) {
 
             if (existing.getStatus() != BookingStatus.APPROVED) {
@@ -71,26 +90,32 @@ public class BookingService {
         return bookingRepository.save(booking);
     }
 
-    // Get all bookings
-    public List<Booking> getAllBookings() {
-        return bookingRepository.findAll();
+    // ADMIN gets all bookings; CLUB gets only its own bookings
+    public List<Booking> getBookingsForUser(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found!"));
+
+        if (user.getRole() == UserRole.ADMIN) {
+            return bookingRepository.findAll();
+        }
+
+        return bookingRepository.findByClubName(user.getClubName());
     }
 
-    // Get only pending bookings
+    // Admin-only pending bookings
     public List<Booking> getPendingBookings() {
         return bookingRepository.findByStatus(BookingStatus.PENDING);
     }
 
-    // Approve or reject a booking
+    // Admin-only approval/rejection
     public Booking updateBookingStatus(String id, BookingStatus newStatus) {
 
-        // Find the booking using its ID
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Booking not found!")
-                );
+                        new IllegalArgumentException("Booking not found!"));
 
-        // Check for conflicts only when approving
         if (newStatus == BookingStatus.APPROVED) {
 
             List<Booking> existingBookings =
@@ -104,12 +129,10 @@ public class BookingService {
 
             for (Booking existing : existingBookings) {
 
-                // Ignore the booking being approved
                 if (existing.getId().equals(id)) {
                     continue;
                 }
 
-                // Only approved bookings block the room
                 if (existing.getStatus() != BookingStatus.APPROVED) {
                     continue;
                 }
@@ -120,7 +143,6 @@ public class BookingService {
                 LocalTime existingEnd =
                         LocalTime.parse(existing.getEndTime());
 
-                // Check whether the time slots overlap
                 if (start.isBefore(existingEnd) && end.isAfter(existingStart)) {
                     throw new IllegalArgumentException(
                             "Another approved booking already occupies this time slot!"
@@ -129,10 +151,7 @@ public class BookingService {
             }
         }
 
-        // Update the booking status
         booking.setStatus(newStatus);
-
-        // Save the updated booking in the database
         return bookingRepository.save(booking);
     }
 }

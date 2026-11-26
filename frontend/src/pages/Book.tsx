@@ -1,14 +1,28 @@
 
-import { useEffect, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
-import type { Room } from "../components/rooms/RoomCard";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { apiFetch } from "../api";
+
+interface Room {
+  id: string;
+  name: string;
+  building: string;
+  capacity: number;
+}
 
 export default function Book() {
+  const navigate = useNavigate();
+
+  const role = sessionStorage.getItem("role");
+  const clubName = sessionStorage.getItem("clubName") || "";
+
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loadingRooms, setLoadingRooms] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState({
-    clubName: "",
     purpose: "",
     roomId: "",
     date: "",
@@ -17,80 +31,108 @@ export default function Book() {
     attendees: "",
   });
 
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  // Fetch rooms from Spring Boot when the page loads
   useEffect(() => {
-    fetch("http://localhost:8080/api/rooms")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Failed to fetch rooms");
-        }
+    if (!sessionStorage.getItem("token")) {
+      navigate("/login");
+      return;
+    }
 
-        return response.json();
-      })
-      .then((data: Room[]) => {
+    if (role !== "CLUB") {
+      setLoading(false);
+      return;
+    }
+
+    const fetchRooms = async () => {
+      try {
+        const response = await apiFetch("/api/rooms");
+        const data: Room[] = await response.json();
         setRooms(data);
-      })
-      .catch((error) => {
-        console.error("Error fetching rooms:", error);
-        setError("Unable to load rooms. Please try again.");
-      })
-      .finally(() => {
-        setLoadingRooms(false);
-      });
-  }, []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load rooms."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRooms();
+  }, [navigate, role]);
 
   const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    setSubmitted(false);
-    setError("");
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    setSubmitting(true);
-    setSubmitted(false);
     setError("");
+    setSuccess("");
+
+    const attendees = Number(formData.attendees);
+
+    if (!formData.purpose.trim()) {
+      setError("Please enter the booking purpose.");
+      return;
+    }
+
+    if (!formData.roomId) {
+      setError("Please select a room.");
+      return;
+    }
+
+    if (attendees <= 0 || !Number.isInteger(attendees)) {
+      setError("Please enter a valid number of attendees.");
+      return;
+    }
+
+    if (formData.startTime >= formData.endTime) {
+      setError("End time must be later than start time.");
+      return;
+    }
+
+    const selectedRoom = rooms.find(
+      (room) => room.id === formData.roomId
+    );
+
+    if (selectedRoom && attendees > selectedRoom.capacity) {
+      setError(
+        `This room has a maximum capacity of ${selectedRoom.capacity}.`
+      );
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const bookingData = {
         id: crypto.randomUUID(),
-        ...formData,
-        attendees: Number(formData.attendees),
+        clubName,
+        purpose: formData.purpose.trim(),
+        roomId: formData.roomId,
+        date: formData.date,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        attendees,
       };
 
-      const response = await fetch(
-        "http://localhost:8080/api/bookings",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(bookingData),
-        }
-      );
+      const response = await apiFetch("/api/bookings", {
+        method: "POST",
+        body: JSON.stringify(bookingData),
+      });
 
       if (!response.ok) {
-        const errorMessage = await response.text();
-        throw new Error(errorMessage || "Booking failed.");
+        throw new Error("Booking request failed.");
       }
 
-      setSubmitted(true);
+      setSuccess("Booking request submitted successfully!");
 
       setFormData({
-        clubName: "",
         purpose: "",
         roomId: "",
         date: "",
@@ -98,206 +140,193 @@ export default function Book() {
         endTime: "",
         attendees: "",
       });
-    } catch (error) {
-      console.error("Booking error:", error);
-
+    } catch (err) {
       setError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again."
+        err instanceof Error
+          ? err.message
+          : "Something went wrong while submitting the booking."
       );
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-slate-600">Loading rooms...</p>
+      </div>
+    );
+  }
+
+  if (role !== "CLUB") {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-20 text-center">
+        <h2 className="text-2xl font-bold text-slate-900">
+          Club access required
+        </h2>
+        <p className="mt-3 text-slate-600">
+          Only club accounts can submit booking requests.
+        </p>
+        <Link
+          to="/login"
+          className="mt-6 inline-block rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700"
+        >
+          Login as Club
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="max-w-2xl">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+    <div className="mx-auto max-w-3xl px-4 py-12">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-slate-900">
           Book a Room
         </h1>
-
-        <p className="mt-4 text-lg text-slate-600">
-          Submit a room booking request for your club's meeting, workshop,
-          or event.
+        <p className="mt-2 text-slate-600">
+          Submit a room booking request for your club.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-10 space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+      >
         <div>
-          <label
-            htmlFor="clubName"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
             Club Name
           </label>
-
           <input
-            id="clubName"
-            name="clubName"
             type="text"
-            required
-            value={formData.clubName}
-            onChange={handleChange}
-            placeholder="e.g. Robotics Club"
-            className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            value={clubName}
+            readOnly
+            className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-slate-600 outline-none"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="purpose"
-            className="block text-sm font-medium text-slate-700"
-          >
-            Event / Purpose
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Purpose of Booking
           </label>
-
           <input
-            id="purpose"
-            name="purpose"
             type="text"
-            required
+            name="purpose"
             value={formData.purpose}
             onChange={handleChange}
-            placeholder="e.g. Weekly team meeting"
-            className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            placeholder="e.g. Workshop, Meeting, Event"
+            required
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="roomId"
-            className="block text-sm font-medium text-slate-700"
-          >
-            Room
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Select Room
           </label>
-
           <select
-            id="roomId"
             name="roomId"
-            required
             value={formData.roomId}
             onChange={handleChange}
-            disabled={loadingRooms || rooms.length === 0}
-            className="mt-2 w-full rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            required
+            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
           >
-            <option value="" disabled>
-              {loadingRooms
-                ? "Loading rooms..."
-                : rooms.length === 0
-                  ? "No rooms available"
-                  : "Select a room"}
-            </option>
-
+            <option value="">Choose a room</option>
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
-                {room.name} — {room.building}
+                {room.name} - {room.building} (Capacity: {room.capacity})
               </option>
             ))}
           </select>
+
+          {rooms.length === 0 && (
+            <p className="mt-2 text-sm text-amber-600">
+              No rooms are currently available.
+            </p>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div>
-            <label
-              htmlFor="date"
-              className="block text-sm font-medium text-slate-700"
-            >
-              Date
-            </label>
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Booking Date
+          </label>
+          <input
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleChange}
+            min={new Date().toLocaleDateString("en-CA")}
+            required
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+          />
+        </div>
 
-            <input
-              id="date"
-              name="date"
-              type="date"
-              required
-              value={formData.date}
-              onChange={handleChange}
-              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
-            />
-          </div>
-
+        <div className="grid gap-5 sm:grid-cols-2">
           <div>
-            <label
-              htmlFor="startTime"
-              className="block text-sm font-medium text-slate-700"
-            >
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
               Start Time
             </label>
-
             <input
-              id="startTime"
-              name="startTime"
               type="time"
-              required
+              name="startTime"
               value={formData.startTime}
               onChange={handleChange}
-              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              required
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="endTime"
-              className="block text-sm font-medium text-slate-700"
-            >
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
               End Time
             </label>
-
             <input
-              id="endTime"
-              name="endTime"
               type="time"
-              required
+              name="endTime"
               value={formData.endTime}
               onChange={handleChange}
-              className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              required
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
             />
           </div>
         </div>
 
         <div>
-          <label
-            htmlFor="attendees"
-            className="block text-sm font-medium text-slate-700"
-          >
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
             Number of Attendees
           </label>
-
           <input
-            id="attendees"
-            name="attendees"
             type="number"
-            min={1}
-            required
+            name="attendees"
             value={formData.attendees}
             onChange={handleChange}
-            placeholder="e.g. 30"
-            className="mt-2 w-full rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 sm:max-w-[200px]"
+            min="1"
+            required
+            placeholder="Enter number of attendees"
+            className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={submitting || loadingRooms || rooms.length === 0}
-          className="w-full rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          {submitting ? "Submitting..." : "Submit Booking"}
-        </button>
-
-        {submitted && (
-          <p className="text-sm font-medium text-green-700">
-            Booking request submitted successfully!
-          </p>
-        )}
-
         {error && (
-          <p className="text-sm font-medium text-red-600">
+          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
             {error}
           </p>
         )}
+
+        {success && (
+          <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+            {success}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting || rooms.length === 0}
+          className="w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {submitting ? "Submitting..." : "Submit Booking Request"}
+        </button>
       </form>
-    </section>
+    </div>
   );
 }

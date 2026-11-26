@@ -145,17 +145,30 @@ export default function CreateEvent() {
         },
       };
 
+      // Get JWT token from browser session storage
+      const token = sessionStorage.getItem("token");
+
+      if (!token) {
+        throw new Error(
+          "Please login again. Authentication token not found."
+        );
+      }
+
+      // Send event request with JWT authentication
       const response = await fetch(EVENTS_API, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
         const message = await response.text();
-        throw new Error(message || "Could not submit event request.");
+        throw new Error(
+          message || `Request failed: ${response.status}`
+        );
       }
 
       setSuccess(

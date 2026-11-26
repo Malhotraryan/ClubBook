@@ -5,13 +5,17 @@ import com.clubbook.backend.Event;
 import com.clubbook.backend.EventStatus;
 import com.clubbook.backend.Booking;
 import com.clubbook.backend.BookingStatus;
+import com.clubbook.backend.User;
+import com.clubbook.backend.UserRole;
 
 import com.clubbook.backend.dto.EventBookingRequest;
 import com.clubbook.backend.repository.EventRepository;
 import com.clubbook.backend.repository.BookingRepository;
+import com.clubbook.backend.repository.UserRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,25 +26,40 @@ public class EventService {
     private final EventRepository eventRepository;
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+    private final UserRepository userRepository;
 
     public EventService(
             EventRepository eventRepository,
             BookingRepository bookingRepository,
-            BookingService bookingService) {
+            BookingService bookingService,
+            UserRepository userRepository) {
 
         this.eventRepository = eventRepository;
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
+        this.userRepository = userRepository;
     }
 
     // Create an event and its room booking together
     @Transactional
-    public Event createEventWithBooking(EventBookingRequest request) {
+    public Event createEventWithBooking(
+            EventBookingRequest request, String email) {
 
         if (request == null || request.getEvent() == null
                 || request.getBooking() == null) {
             throw new IllegalArgumentException(
                     "Event and booking details are required!");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found!"));
+
+        // Only CLUB users can create events
+        if (user.getRole() != UserRole.CLUB) {
+            throw new AccessDeniedException(
+                    "Only club accounts can create events."
+            );
         }
 
         Event event = request.getEvent();
@@ -50,8 +69,13 @@ public class EventService {
             throw new IllegalArgumentException("Event title is required!");
         }
 
+        // Never trust the club name submitted by the frontend
+        event.setClubName(user.getClubName());
+        booking.setClubName(user.getClubName());
+
         // Both records must contain matching information
-        if (!event.getClubName().equals(booking.getClubName())
+        if (event.getClubName() == null
+                || !event.getClubName().equals(booking.getClubName())
                 || !event.getDate().equals(booking.getDate())
                 || !event.getStartTime().equals(booking.getStartTime())
                 || !event.getEndTime().equals(booking.getEndTime())
@@ -66,7 +90,7 @@ public class EventService {
         event.setId(UUID.randomUUID().toString());
 
         // Create the room booking using existing validation
-        Booking savedBooking = bookingService.createBooking(booking);
+        Booking savedBooking = bookingService.createBooking(booking, email);
 
         // Connect the event to the newly created booking
         event.setBookingId(savedBooking.getId());
@@ -75,7 +99,7 @@ public class EventService {
         return eventRepository.save(event);
     }
 
-    // Get publicly visible events
+    // Publicly visible events
     public List<Event> getApprovedEvents() {
 
         return eventRepository.findByStatus(EventStatus.APPROVED)
@@ -88,41 +112,50 @@ public class EventService {
                 .toList();
     }
 
-    // Get all events
+    // ADMIN gets all events; CLUB gets only its own events
+    public List<Event> getEventsForUser(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("User not found!"));
+
+        if (user.getRole() == UserRole.ADMIN) {
+            return eventRepository.findAll();
+        }
+
+        return eventRepository.findByClubName(user.getClubName());
+    }
+
+    // Admin-only list
     public List<Event> getAllEvents() {
         return eventRepository.findAll();
     }
 
-    // Get pending events
+    // Admin-only pending events
     public List<Event> getPendingEvents() {
         return eventRepository.findByStatus(EventStatus.PENDING);
     }
 
-    // Approve or reject an event
-    // Approve or reject an event and its associated booking
+    // Admin-only approval/rejection
+
     @Transactional
     public Event updateEventStatus(String id, EventStatus newStatus) {
 
-        // Find the event
         Event event = eventRepository.findById(id)
                 .orElseThrow(() ->
                         new IllegalArgumentException("Event not found!"));
 
-        // Find its associated booking
         Booking booking = bookingRepository.findById(event.getBookingId())
                 .orElseThrow(() ->
                         new IllegalArgumentException("Associated booking not found!"));
 
-        // Update booking according to the event decision
+        // Update booking status
         if (newStatus == EventStatus.APPROVED) {
-
             bookingService.updateBookingStatus(
                     booking.getId(),
                     BookingStatus.APPROVED
             );
-
         } else if (newStatus == EventStatus.REJECTED) {
-
             bookingService.updateBookingStatus(
                     booking.getId(),
                     BookingStatus.REJECTED
@@ -132,6 +165,13 @@ public class EventService {
         // Update event status
         event.setStatus(newStatus);
 
-        return eventRepository.save(event);
+        // Save event explicitly
+        Event savedEvent = eventRepository.saveAndFlush(event);
+
+        System.out.println("Updated Event ID: " + savedEvent.getId());
+        System.out.println("Updated Event Status: " + savedEvent.getStatus());
+
+        return savedEvent;
     }
+
 }

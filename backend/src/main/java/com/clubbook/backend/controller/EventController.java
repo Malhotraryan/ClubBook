@@ -6,10 +6,12 @@ import com.clubbook.backend.EventStatus;
 import com.clubbook.backend.dto.EventBookingRequest;
 import com.clubbook.backend.service.EventService;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 public class EventController {
 
@@ -19,41 +21,63 @@ public class EventController {
         this.eventService = eventService;
     }
 
-    // Create event and room booking together
+    // CLUB only: create event with room booking
     @PostMapping("/api/events/create-with-booking")
+    @PreAuthorize("hasRole('CLUB')")
     public Event createEventWithBooking(
-            @RequestBody EventBookingRequest request) {
+            @RequestBody EventBookingRequest request,
+            Authentication authentication) {
 
-        return eventService.createEventWithBooking(request);
+        return eventService.createEventWithBooking(
+                request,
+                authentication.getName()
+        );
     }
 
-    // Public events
+    // Public: view approved events
     @GetMapping("/api/events")
     public List<Event> getApprovedEvents() {
         return eventService.getApprovedEvents();
     }
 
-    // All events for admin
+    // CLUB gets its own events; ADMIN gets all events
+    @GetMapping("/api/events/mine")
+    @PreAuthorize("hasAnyRole('CLUB', 'ADMIN')")
+    public List<Event> getMyEvents(Authentication authentication) {
+        return eventService.getEventsForUser(authentication.getName());
+    }
+
+    // ADMIN only: view all events
     @GetMapping("/api/events/all")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Event> getAllEvents() {
         return eventService.getAllEvents();
     }
 
-    // Pending events for admin
+    // ADMIN only: view pending events
     @GetMapping("/api/events/pending")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Event> getPendingEvents() {
         return eventService.getPendingEvents();
     }
 
-    // Approve event
+    // ADMIN only: approve event
     @PutMapping("/api/events/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public Event approveEvent(@PathVariable String id) {
-        return eventService.updateEventStatus(id, EventStatus.APPROVED);
+        return eventService.updateEventStatus(
+                id,
+                EventStatus.APPROVED
+        );
     }
 
-    // Reject event
+    // ADMIN only: reject event
     @PutMapping("/api/events/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     public Event rejectEvent(@PathVariable String id) {
-        return eventService.updateEventStatus(id, EventStatus.REJECTED);
+        return eventService.updateEventStatus(
+                id,
+                EventStatus.REJECTED
+        );
     }
 }

@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "../api";
 
 interface Booking {
   id: string;
@@ -33,12 +34,12 @@ export default function AdminBookings() {
       setError("");
 
       const [bookingResponse, roomResponse] = await Promise.all([
-        fetch("http://localhost:8080/api/bookings/pending"),
+        apiFetch("/api/bookings/pending"),
         fetch("http://localhost:8080/api/rooms"),
       ]);
 
-      if (!bookingResponse.ok || !roomResponse.ok) {
-        throw new Error("Failed to load booking requests.");
+      if (!roomResponse.ok) {
+        throw new Error("Failed to load rooms.");
       }
 
       const bookingData: Booking[] = await bookingResponse.json();
@@ -48,7 +49,11 @@ export default function AdminBookings() {
       setRooms(roomData);
     } catch (error) {
       console.error("Admin bookings error:", error);
-      setError("Unable to load booking requests. Please try again.");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load booking requests."
+      );
     } finally {
       setLoading(false);
     }
@@ -76,19 +81,10 @@ export default function AdminBookings() {
       setActionLoadingId(id);
       setError("");
 
-      const response = await fetch(
-        `http://localhost:8080/api/bookings/${id}/${action}`,
-        {
-          method: "PUT",
-        }
-      );
+      await apiFetch(`/api/bookings/${id}/${action}`, {
+        method: "PUT",
+      });
 
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || `Failed to ${action} booking.`);
-      }
-
-      // Refresh the pending booking list
       await fetchData();
     } catch (error) {
       console.error("Booking action error:", error);
@@ -104,8 +100,6 @@ export default function AdminBookings() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-
-      {/* Page heading */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
           Admin Bookings
@@ -116,7 +110,6 @@ export default function AdminBookings() {
         </p>
       </div>
 
-      {/* Pending booking count */}
       <div className="mt-10 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-sm font-medium text-slate-500">
           Pending Requests
@@ -127,14 +120,12 @@ export default function AdminBookings() {
         </p>
       </div>
 
-      {/* Error message */}
       {error && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Booking requests */}
       <div className="mt-12">
         <h2 className="text-xl font-bold text-slate-900">
           Booking Requests
@@ -146,7 +137,6 @@ export default function AdminBookings() {
           </p>
         ) : bookings.length > 0 ? (
           <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
-
             {bookings.map((booking) => (
               <div
                 key={booking.id}
@@ -168,9 +158,7 @@ export default function AdminBookings() {
                   </span>
                 </div>
 
-                {/* Booking details */}
                 <div className="mt-5 space-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
-
                   <p>
                     <span className="font-medium text-slate-800">
                       Room:
@@ -200,9 +188,7 @@ export default function AdminBookings() {
                   </p>
                 </div>
 
-                {/* Approve and Reject buttons */}
                 <div className="mt-6 flex gap-3">
-
                   <button
                     type="button"
                     disabled={actionLoadingId !== ""}
@@ -228,11 +214,9 @@ export default function AdminBookings() {
                       ? "Processing..."
                       : "Reject"}
                   </button>
-
                 </div>
               </div>
             ))}
-
           </div>
         ) : (
           <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">

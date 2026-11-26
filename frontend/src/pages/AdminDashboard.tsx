@@ -1,118 +1,185 @@
 
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { apiFetch } from "../api";
+import LogoutButton from "../components/LogoutButton";
 
 interface Booking {
   id: string;
   clubName: string;
-  purpose: string;
-  roomId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  attendees: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+}
+
+interface ClubEvent {
+  id: string;
+  title: string;
+  clubName: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
 }
 
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [events, setEvents] = useState<ClubEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/bookings")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Failed to fetch bookings");
-        }
-        return response.json();
-      })
-      .then((data: Booking[]) => {
-        setBookings(data);
-      })
-      .catch((error) => {
-        console.error("Admin dashboard error:", error);
-        setError("Unable to load dashboard data.");
-      })
-      .finally(() => {
+    async function loadAdminDashboard() {
+      try {
+        const [bookingResponse, eventResponse] = await Promise.all([
+          apiFetch("/api/bookings"),
+          apiFetch("/api/events/all"),
+        ]);
+
+        const bookingData: Booking[] = await bookingResponse.json();
+        const eventData: ClubEvent[] = await eventResponse.json();
+
+        setBookings(bookingData);
+        setEvents(eventData);
+      } catch (err) {
+        console.error("Admin dashboard error:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load admin dashboard."
+        );
+      } finally {
         setLoading(false);
-      });
+      }
+    }
+
+    loadAdminDashboard();
   }, []);
 
-  const pendingCount = bookings.filter(
+  const pendingBookings = bookings.filter(
     (booking) => booking.status === "PENDING"
   ).length;
 
-  const approvedCount = bookings.filter(
-    (booking) => booking.status === "APPROVED"
+  const pendingEvents = events.filter(
+    (event) => event.status === "PENDING"
   ).length;
 
-  const rejectedCount = bookings.filter(
-    (booking) => booking.status === "REJECTED"
-  ).length;
+  const totalClubs = new Set(
+    bookings.map((booking) => booking.clubName).filter(Boolean)
+  ).size;
 
-  const stats = [
-    {
-      title: "Total Bookings",
-      count: bookings.length,
-      style: "bg-blue-50 text-blue-700",
-    },
-    {
-      title: "Pending Requests",
-      count: pendingCount,
-      style: "bg-amber-50 text-amber-700",
-    },
-    {
-      title: "Approved Bookings",
-      count: approvedCount,
-      style: "bg-green-50 text-green-700",
-    },
-    {
-      title: "Rejected Bookings",
-      count: rejectedCount,
-      style: "bg-red-50 text-red-700",
-    },
-  ];
+  const statusStyles = {
+    PENDING: "bg-amber-50 text-amber-700",
+    APPROVED: "bg-green-50 text-green-700",
+    REJECTED: "bg-red-50 text-red-700",
+  };
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-          Admin Dashboard
-        </h1>
-
-        <p className="mt-4 text-lg text-slate-600">
-          Overview of classroom bookings and requests.
-        </p>
+    <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="mb-10 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Admin Dashboard
+          </h1>
+          <p className="mt-2 text-slate-600">
+            Manage club bookings, events and approvals.
+          </p>
+        </div>
       </div>
 
       {loading ? (
-        <p className="mt-10 text-slate-600">Loading dashboard...</p>
+        <p className="mt-10 text-slate-600">Loading admin dashboard...</p>
       ) : error ? (
         <p className="mt-10 text-red-600">{error}</p>
       ) : (
         <>
           {/* Statistics */}
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.title}
-                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Total Bookings
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {bookings.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Pending Bookings
+              </p>
+              <p className="mt-2 text-3xl font-bold text-amber-600">
+                {pendingBookings}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Total Events
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900">
+                {events.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Pending Events
+              </p>
+              <p className="mt-2 text-3xl font-bold text-amber-600">
+                {pendingEvents}
+              </p>
+            </div>
+          </div>
+
+          {/* Management links */}
+          <div className="mt-12">
+            <h2 className="text-xl font-bold text-slate-900">
+              Management
+            </h2>
+
+            <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+              <Link
+                to="/admin/bookings"
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
               >
-                <p className="text-sm font-medium text-slate-500">
-                  {stat.title}
+                <h3 className="font-semibold text-slate-900">
+                  Manage Bookings
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Review and approve or reject club booking requests.
                 </p>
-
-                <p className="mt-3 text-3xl font-bold text-slate-900">
-                  {stat.count}
+                <p className="mt-4 text-sm font-semibold text-blue-600">
+                  View bookings →
                 </p>
+              </Link>
 
-                <span
-                  className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${stat.style}`}
-                >
-                  {stat.title}
-                </span>
-              </div>
-            ))}
+              <Link
+                to="/admin/events"
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+              >
+                <h3 className="font-semibold text-slate-900">
+                  Manage Events
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Review event requests submitted by clubs.
+                </p>
+                <p className="mt-4 text-sm font-semibold text-blue-600">
+                  View events →
+                </p>
+              </Link>
+
+              <Link
+                to="/rooms"
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+              >
+                <h3 className="font-semibold text-slate-900">
+                  Manage Rooms
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  View available rooms and room information.
+                </p>
+                <p className="mt-4 text-sm font-semibold text-blue-600">
+                  View rooms →
+                </p>
+              </Link>
+            </div>
           </div>
 
           {/* Recent bookings */}
@@ -121,47 +188,30 @@ export default function AdminDashboard() {
               Recent Booking Requests
             </h2>
 
-            {bookings.length > 0 ? (
-              <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                <table className="w-full min-w-[650px] text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-slate-600">
+            {bookings.length === 0 ? (
+              <p className="mt-5 text-slate-500">No bookings found.</p>
+            ) : (
+              <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="px-5 py-4 font-semibold">Club</th>
-                      <th className="px-5 py-4 font-semibold">Purpose</th>
-                      <th className="px-5 py-4 font-semibold">Date</th>
-                      <th className="px-5 py-4 font-semibold">Time</th>
-                      <th className="px-5 py-4 font-semibold">Status</th>
+                      <th className="px-5 py-4">Club</th>
+                      <th className="px-5 py-4">Booking ID</th>
+                      <th className="px-5 py-4">Status</th>
                     </tr>
                   </thead>
-
-                  <tbody className="divide-y divide-slate-100">
-                    {bookings.slice(-5).reverse().map((booking) => (
-                      <tr key={booking.id} className="hover:bg-slate-50">
+                  <tbody>
+                    {bookings.slice(0, 5).map((booking) => (
+                      <tr key={booking.id} className="border-t border-slate-100">
                         <td className="px-5 py-4 font-medium text-slate-900">
                           {booking.clubName}
                         </td>
-
                         <td className="px-5 py-4 text-slate-600">
-                          {booking.purpose}
+                          {booking.id}
                         </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {booking.date}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {booking.startTime} – {booking.endTime}
-                        </td>
-
                         <td className="px-5 py-4">
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              booking.status === "PENDING"
-                                ? "bg-amber-50 text-amber-700"
-                                : booking.status === "APPROVED"
-                                ? "bg-green-50 text-green-700"
-                                : "bg-red-50 text-red-700"
-                            }`}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[booking.status]}`}
                           >
                             {booking.status}
                           </span>
@@ -171,10 +221,6 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500">
-                No bookings have been submitted yet.
-              </p>
             )}
           </div>
         </>
