@@ -12,6 +12,7 @@ import com.clubbook.backend.dto.EventBookingRequest;
 import com.clubbook.backend.repository.EventRepository;
 import com.clubbook.backend.repository.BookingRepository;
 import com.clubbook.backend.repository.UserRepository;
+import com.clubbook.backend.repository.RoomRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,17 +28,20 @@ public class EventService {
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final UserRepository userRepository;
+    private final RoomRepository roomRepository;
 
     public EventService(
             EventRepository eventRepository,
             BookingRepository bookingRepository,
             BookingService bookingService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            RoomRepository roomRepository) {
 
         this.eventRepository = eventRepository;
         this.bookingRepository = bookingRepository;
         this.bookingService = bookingService;
         this.userRepository = userRepository;
+        this.roomRepository = roomRepository;
     }
 
     // Create an event and its room booking together
@@ -99,16 +103,30 @@ public class EventService {
         return eventRepository.save(event);
     }
 
-    // Publicly visible events
+    // Publicly visible events with their venue
     public List<Event> getApprovedEvents() {
 
         return eventRepository.findByStatus(EventStatus.APPROVED)
                 .stream()
-                .filter(event ->
-                        bookingRepository.findById(event.getBookingId())
-                                .map(booking ->
-                                        booking.getStatus() == BookingStatus.APPROVED)
-                                .orElse(false))
+                .filter(event -> {
+                    Booking booking = bookingRepository
+                            .findById(event.getBookingId())
+                            .orElse(null);
+
+                    if (booking == null
+                            || booking.getStatus() != BookingStatus.APPROVED) {
+                        return false;
+                    }
+
+                    roomRepository.findById(booking.getRoomId())
+                            .ifPresent(room ->
+                                    event.setVenue(
+                                            room.getName() + ", " + room.getBuilding()
+                                    )
+                            );
+
+                    return true;
+                })
                 .toList();
     }
 
@@ -137,7 +155,6 @@ public class EventService {
     }
 
     // Admin-only approval/rejection
-
     @Transactional
     public Event updateEventStatus(String id, EventStatus newStatus) {
 
@@ -149,7 +166,6 @@ public class EventService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("Associated booking not found!"));
 
-        // Update booking status
         if (newStatus == EventStatus.APPROVED) {
             bookingService.updateBookingStatus(
                     booking.getId(),
@@ -162,16 +178,8 @@ public class EventService {
             );
         }
 
-        // Update event status
         event.setStatus(newStatus);
 
-        // Save event explicitly
-        Event savedEvent = eventRepository.saveAndFlush(event);
-
-        System.out.println("Updated Event ID: " + savedEvent.getId());
-        System.out.println("Updated Event Status: " + savedEvent.getStatus());
-
-        return savedEvent;
+        return eventRepository.save(event);
     }
-
 }

@@ -117,11 +117,11 @@ export default function Events() {
                   Campus Event
                 </span>
 
-                {event.status && (
+                {/* {event.status && (
                   <span className="text-xs font-medium text-slate-500">
                     {event.status}
                   </span>
-                )}
+                )} */}
               </div>
 
               <h2 className="text-xl font-bold text-slate-900">

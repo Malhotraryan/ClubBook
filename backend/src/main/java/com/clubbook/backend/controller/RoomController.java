@@ -1,8 +1,7 @@
 package com.clubbook.backend.controller;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
-
 import com.clubbook.backend.Room;
+import com.clubbook.backend.dto.RoomBookingResponse;
 import com.clubbook.backend.service.RoomService;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +21,12 @@ public class RoomController {
     @GetMapping("/api/rooms")
     public List<Room> getRooms() {
         return roomService.getAllRooms();
+    }
+
+    // Get upcoming approved bookings for a room
+    @GetMapping("/api/rooms/{id}/bookings/upcoming")
+    public List<RoomBookingResponse> getUpcomingBookings(@PathVariable String id) {
+        return roomService.getUpcomingBookings(id);
     }
 
     // Get room by ID

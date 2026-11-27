@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "events")
@@ -26,6 +27,11 @@ public class Event {
 
     // Connects this event to its room booking
     private String bookingId;
+
+    // Venue is calculated from the associated room.
+    // It is not stored as a database column.
+    @Transient
+    private String venue;
 
     @Enumerated(EnumType.STRING)
     private EventStatus status = EventStatus.PENDING;
@@ -118,6 +124,14 @@ public class Event {
 
     public void setBookingId(String bookingId) {
         this.bookingId = bookingId;
+    }
+
+    public String getVenue() {
+        return venue;
+    }
+
+    public void setVenue(String venue) {
+        this.venue = venue;
     }
 
     public EventStatus getStatus() {

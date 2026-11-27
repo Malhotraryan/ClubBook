@@ -165,7 +165,7 @@ export default function AdminDashboard() {
                 </p>
               </Link>
 
-              <Link
+              {/* <Link
                 to="/rooms"
                 className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
               >
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
                 <p className="mt-4 text-sm font-semibold text-blue-600">
                   View rooms →
                 </p>
-              </Link>
+              </Link> */}
             </div>
           </div>
 

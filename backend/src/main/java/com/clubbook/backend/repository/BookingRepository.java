@@ -1,4 +1,3 @@
-
 package com.clubbook.backend.repository;
 
 import com.clubbook.backend.Booking;
@@ -14,4 +13,10 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     List<Booking> findByStatus(BookingStatus status);
 
     List<Booking> findByClubName(String clubName);
+
+    List<Booking> findByRoomIdAndStatusAndDateGreaterThanEqualOrderByDateAscStartTimeAsc(
+            String roomId,
+            BookingStatus status,
+            String date
+    );
 }

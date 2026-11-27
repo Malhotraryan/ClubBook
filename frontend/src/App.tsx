@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import Home from "./pages/Home";
 import Rooms from "./pages/Rooms";
+import RoomDetails from "./pages/RoomDetails";
 import Events from "./pages/Events";
 import Book from "./pages/Book";
 import Login from "./pages/Login";
@@ -20,6 +21,7 @@ function App() {
         {/* Public pages */}
         <Route path="/" element={<Home />} />
         <Route path="/rooms" element={<Rooms />} />
+        <Route path="/rooms/:id" element={<RoomDetails />} />
         <Route path="/events" element={<Events />} />
         <Route path="/login" element={<Login />} />
 

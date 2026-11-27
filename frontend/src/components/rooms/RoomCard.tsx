@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 
 export type RoomStatus = "AVAILABLE" | "MAINTENANCE";
 
@@ -80,12 +82,12 @@ export default function RoomCard({ room }: RoomCardProps) {
         </div>
       )}
 
-      <button
-        type="button"
-        className="mt-4 w-full rounded-md border border-slate-300 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-600 hover:text-blue-600"
+      <Link
+        to={`/rooms/${encodeURIComponent(room.id)}`}
+        className="mt-4 block w-full rounded-md border border-slate-300 py-2 text-center text-sm font-semibold text-slate-700 transition-colors hover:border-blue-600 hover:text-blue-600"
       >
-        View Room
-      </button>
+        View Details
+      </Link>
     </div>
   );
 }
